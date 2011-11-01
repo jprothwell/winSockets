@@ -5,8 +5,10 @@ using namespace ws;
 UINT Socket::_refCount = 0;
 
 Socket::Socket() :
-  _socket(INVALID_SOCKET)
+  _socket(INVALID_SOCKET),
+  _blocking(true)
 {
+  ZeroMemory(&_timeout, sizeof(_timeout));
   ZeroMemory(&_sockAddr, sizeof(_sockAddr));
   if (!_refCount)
   {
@@ -56,13 +58,12 @@ bool Socket::Connect(const char* remoteIP, USHORT remotePort)
   hostent* hn = gethostbyname(remoteIP);
 
   sockaddr_in RemoteAddr;
-  ::ZeroMemory(&RemoteAddr, sizeof(RemoteAddr));
+  ZeroMemory(&RemoteAddr, sizeof(RemoteAddr));
   RemoteAddr.sin_family = AF_INET;
   RemoteAddr.sin_port = htons(remotePort);
   RemoteAddr.sin_addr.s_addr = *(u_long *) hn->h_addr_list[0];
-  if (connect(_socket, (SOCKADDR*)&RemoteAddr, sizeof(RemoteAddr)) == SOCKET_ERROR)
-    return false;
-  return true;
+
+  return !(connect(_socket, (SOCKADDR*)&RemoteAddr, sizeof(RemoteAddr)) == SOCKET_ERROR);
 }
 
 bool Socket::Bind(const char* localIP, USHORT localPort)
@@ -70,12 +71,13 @@ bool Socket::Bind(const char* localIP, USHORT localPort)
   if (!IsOpen())
     return false;
 
+  hostent* hn = gethostbyname(localIP);
+
   _sockAddr.sin_family = AF_INET;
   _sockAddr.sin_port = htons(localPort);
-  _sockAddr.sin_addr.s_addr = inet_addr(localIP);
-  if (bind(_socket, (SOCKADDR*)&_sockAddr, sizeof(_sockAddr)) == SOCKET_ERROR)    
-    return false;
-  return true;
+  _sockAddr.sin_addr.s_addr = *(u_long *) hn->h_addr_list[0];
+
+  return !(bind(_socket, (SOCKADDR*)&_sockAddr, sizeof(_sockAddr)) == SOCKET_ERROR);
 }
 
 bool Socket::Listen(int backlog)
@@ -83,9 +85,7 @@ bool Socket::Listen(int backlog)
   if (!IsOpen())
     return false;
 
-  if (listen(_socket, backlog) == SOCKET_ERROR)
-    return false;
-  return true;
+  return !(listen(_socket, backlog) == SOCKET_ERROR);
 }
 
 void Socket::Accept(Socket *newSocket)
@@ -103,12 +103,24 @@ int Socket::SendData(const char* data, int len)
   if (!IsOpen())
     return 0;
 
+  fd_set fsd;
+  FD_ZERO(&fsd);
+  FD_SET(_socket, &fsd);
+  if (_blocking && select(0, &fsd, 0, 0, &_timeout) == SOCKET_ERROR)
+    return 0;
+
   return send(_socket, data, len, 0);
 }
 
 int Socket::RecvData(char* data, int len)
 {
   if (!IsOpen())
+    return 0;
+
+  fd_set frd;
+  FD_ZERO(&frd);
+  FD_SET(_socket, &frd);
+  if (_blocking && select(0, 0, &frd, 0, &_timeout) == SOCKET_ERROR)
     return 0;
 
   return recv(_socket, data, len, 0);
@@ -122,6 +134,28 @@ bool Socket::IsOpen() const
 int Socket::GetErrorCode() const
 {
   return WSAGetLastError();
+}
+
+SOCKET Socket::GetSocket() const
+{
+  return _socket;
+}
+
+void Socket::SetTimeOut(long sec, long u_sec)
+{
+  _timeout.tv_sec = sec;
+  _timeout.tv_usec = u_sec;
+}
+
+bool Socket::SetBloking(bool blocking)
+{
+  if (!IsOpen())
+    return false;
+  _blocking = blocking;
+  blocking = !blocking;
+  if (ioctlsocket (_socket, FIONBIO, (u_long*) &blocking) == SOCKET_ERROR)
+    return false;
+  return true;
 }
 
 //===============TCP==================

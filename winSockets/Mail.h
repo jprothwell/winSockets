@@ -13,10 +13,12 @@ namespace ws
     SMTPClient();
     virtual ~SMTPClient();
 
-    bool SendCommand(const char* command);
-    const char* RecvLog();
-    const char* SendAndRecvCommand(const char* command);
+    virtual bool ConnectServer(const char* ipServer, USHORT portServer);
+
+    const char* SendCommand(const char* command);
+    const char* SendMessage(const char* message);
     bool SendAuth(const char* login, const char* password);
   };
+
 }
 #endif

@@ -4,8 +4,6 @@
 #include <WinSock2.h>
 #pragma comment (lib, "Ws2_32.lib")
 
-#define MAX_NUMBER_SOCKETS 255
-
 namespace ws
 {
   class Socket
@@ -14,28 +12,32 @@ namespace ws
     Socket();
     virtual ~Socket();
 
+    virtual bool IsOpen() const;
+    virtual int  GetErrorCode() const;
+    SOCKET  GetSocket() const;
+
     virtual int SendData(const char* data, int len);
     virtual int RecvData(char* data, int len);
 
-    bool IsOpen() const;
-    int  GetErrorCode() const;
+    bool    Create(int type, int protocol);
+    bool    Close();
 
-  protected:
-    bool Create(int type, int protocol);
-    bool Close();
+    bool    Connect(const char* remoteIP, USHORT remotePort);
 
-    bool Connect(const char* remoteIP, USHORT remotePort);
+    bool    Bind(const char* localIP, USHORT localPort);
+    bool    Listen(int backlog);
+    void    Accept(Socket *newSocket);
 
-    bool Bind(const char* localIP, USHORT localPort);
-    bool Listen(int backlog);
-    void Accept(Socket *newSocket);
-
-    SOCKET      _socket;
-
+    void    SetTimeOut(long sec, long u_sec);
+    bool    SetBloking(bool blocking);
+    
   private:
+    SOCKET      _socket;
     static UINT _refCount;
     WSADATA     _wsd;
     sockaddr_in _sockAddr;
+    timeval     _timeout;
+    bool        _blocking;
   };
 
   class TCPSocket : public Socket
@@ -43,7 +45,6 @@ namespace ws
   public:
     TCPSocket();
     virtual ~TCPSocket();
-  protected:
   };
 
   class UDPSocket : public Socket
@@ -51,7 +52,6 @@ namespace ws
   public:
     UDPSocket();
     virtual ~UDPSocket();
-  protected:
   };
 }
 

@@ -5,27 +5,36 @@
 
 namespace ws
 {
-  class TCPServer : public TCPSocket
+  class TCPServer
   {
   public:
-    TCPServer(const char* ipServer, USHORT portServer, int maxNumberConnections);
+    TCPServer();
     virtual ~TCPServer();
 
+    bool CreateServer(const char* ipServer, USHORT portServer, int maxNumberConnections);
+    bool CloseServer();
     TCPSocket* WaitNewClient();
-  
-  private:
+
+  protected:
     void clearSockets();
-    TCPSocket* _tcpSockets[MAX_NUMBER_SOCKETS];
-    int _numNewClient;
+    TCPSocket   _serverSocket;
+    TCPSocket*  _tcpSockets[FD_SETSIZE];
+    int         _numNewClient;
   };
 
-  class TCPClient : public TCPSocket
+  class TCPClient
   {
   public:
     TCPClient();
     virtual ~TCPClient();
 
-    bool ConnectServer(const char* ipServer, USHORT portServer);
+    virtual bool ConnectServer(const char* ipServer, USHORT portServer);
+    bool CloseClient();
+    int SendData(const char* data, int len);
+    int RecvData(char* data, int len);
+  
+  protected:
+    TCPSocket _clientSocket;
   };
 }
 
